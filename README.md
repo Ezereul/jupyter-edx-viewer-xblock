@@ -1,127 +1,88 @@
 # Jupyter Notebook Viewer
 
 ## Overview
-_Fetch and display part of, or an entire Jupyter Notebook in an XBlock._
-
-Jupyter is a "killer app" for education, said Prof. Lorena Barba in her [keynote](http://lorenabarba.com/gallery/prof-barba-gave-keynote-at-scipy-2014/) at the 2014 Scientific Python Conference ([video](https://youtu.be/TWxwKDT88GU?t=9m24s) available).
-Many people are writing lessons, tutorials, whole courses and even books using Jupyter.
-It is a **new genre of open educational resource** (OER).
-What if you want to create an online course on Open edX using content originally written as Jupyter notebook?
-You certainly don't want to duplicate the content, much less copy-and-paste.
-This XBlock allows you to embed the content dynamically from a notebook available on a public URL.
-
-Prof. Barba used the XBlock in the second half of her course module, [Get Data Off The Ground with Python](https://openedx.seas.gwu.edu/courses/course-v1:GW+EngComp1+2018/about).
-Check it out!
+Это форк репозитория [jupyter-edx-viewer-xblock](https://github.com/iblai/jupyter-edx-viewer-xblock), адаптированный для работы в tutor. 
+В файле `jupyter_viewer.yml` выполняется шаг `LMS/CMS Setup` из оригинального репозитория
 
 
 ## Installation
 ### XBlock
-* login as the root user: `sudo -i`
-* New Installation:
-    * `/edx/bin/pip.edxapp install git+https://github.com/ibleducation/jupyter-viewer-xblock.git`
-* Re-Installation:
-    * `/edx/bin/pip.edxapp install --upgrade --no-deps --force-reinstall git+https://github.com/ibleducation/jupyter-viewer-xblock.git`
-* Restart the `edxapp` via `/edx/bin/supervisorctl restart edxapp:`
-
-### Edx Server Setup
-* In the studio, go to the course you would like to implement this XBlock in
-* Under `Settings` at the top, select `Advanced Settings`
-* in the Advanced Module List, add: `"xblock_jupyter_viewer"`
-    * ensure there is a comma after the second to last entry, and no comma exists after the last entry
-* Select Save
-
-The viewer can now be added to a unit by selecting `Jupyter Notebook Viewer` from the `Advanced` component menu
-
-### LMS/CMS Setup
-In the following two files:
-* `/edx/app/edxapp/edx-platform/lms/urls.py` 
-* `/edx/app/edxapp/edx-platform/cms/urls.py` 
-
-Add the following to the bottom of each file:
-```python
-# Jupyter Viewer XBlock Endpoint
-urlpatterns += (
-    url(r'^api/jupyter/', include('xblock_jupyter_viewer.rest.urls', 
-                                  namespace='xblock_jupyter_viewer')),
-)
+* Добавить в переменную окружения `OPENEDX_EXTRA_PIP_REQUIREMENTS` ссылку не репозиторий
+```bash
+tutor config save --append OPENEDX_EXTRA_PIP_REQUIREMENTS='git+https://github.com/Ezereul/jupyter-edx-viewer-xblock.git'
 ```
-
-In the following files:
-* `/edx/app/edxapp/edx-platform/lms/envs/common.py` 
-* `/edx/app/edxapp/edx-platform/cms/envs/common.py` 
-
-Add the following at the bottom of the `INSTALLED_APPS` section:
-```python
-    # Jupyter Notebook Viewer XBlock
-    'xblock_jupyter_viewer',
+* Скопировать файл jupyter_viewer.yml в папку tutor-plugins
+* Затем активировать плагин jupyter_viewer
+```bash
+tutor plugins enable jupyter_viewer
 ```
+* Пересобрать образы и запустить платформу
 
-Restart `edxapp` via `/edx/bin/supervisorctl restart edxapp:`
+### Добавление блока на платформе
+1. Зайти в studio
+2. Раскрыть `Настройки` в шапке страницы и выбрать `Расширенные настройки`
+3. Найти `Advanced Module List`/`Список дополнительных модулей` и добавить туда `"xblock_jupyter_viewer"`
+4. После этого блок `Jupyter Notebook Viewer` станет доступен во вкладке `Дополнительно` при редактировании курса
 
-## How it works
-The XBlock contains an `iframe` that points to the REST endpoint.
+## Как это работает
+XBlock содержит `iframe`, который указывает на REST-эндпоинт.
 
-The REST endpoint takes the following query parameters:
-* `url`: URL to the **RAW** jupyter notebook JSON file
-* `start`: (optional) text that starting cell contains
-    * if supplied, will start in **FIRST** cell that contains this text
-    * if not supplied, it starts at the beginning
-* `end`: (optional) text that ending cell contains
-    * if supplied, will end at **FIRST** cell that contains this text (not-inclusive - this cell is not shown) 
-    * if not supplied, it will end at the end of the document
-* `images_url`: (optional) url to root of an images location (for `<img>` tags)
-    * if supplied, this will be pre-pended to the filename in the `src` attribute of all `<img src=...>` tags in the notebook
-    * example: 
-        * images_url :`http://mysite.com/images/`
-        * `<img src="/something/image.jpg">` becomes `<img src="http://mysite.com/images/image.jp">`
+REST-эндпоинт принимает следующие параметры запроса:
+* `url`: URL к **RAW** файлу Jupyter Notebook в формате JSON
+* `start`: (необязательно) текст, который содержится в начальной ячейке
+    * если указано, отображение начнется с **ПЕРВОЙ** ячейки, содержащей этот текст
+    * если не указано, отображение начнется с начала документа
+* `end`: (необязательно) текст, который содержится в конечной ячейке
+    * если указано, отображение завершится на **ПЕРВОЙ** ячейке, содержащей этот текст (исключительно - эта ячейка не отображается)
+    * если не указано, отображение завершится в конце документа
+* `images_url`: (необязательно) URL к корневому каталогу для изображений (для тегов `<img>`)
+    * если указано, этот URL будет добавлен в начало имени файла в атрибуте `src` всех тегов `<img src=...>` в ноутбуке
+    * пример:
+        * images_url: `http://mysite.com/images/`
+        * `<img src="/something/image.jpg">` станет `<img src="http://mysite.com/images/image.jpg">`
 
-It is often easiest to use the markdown headers as the start/end tags, eg:
-* `### My Start Header`
+Часто проще всего использовать заголовки Markdown в качестве начальных/конечных тегов, например:
+* `### Мой стартовый заголовок`
 
-If either start/end tags cannot be found in the document, they are ignored.
+Если начальные/конечные теги не найдены в документе, они игнорируются.
 
-The REST endpoint returns the entire HTML + embedded CSS in order to be rendered in the XBlock iframe.
+REST-эндпоинт возвращает весь HTML-код с встроенными CSS для отображения в iframe XBlock.
 
-The user can also set the height of the XBlock in pixels in the Studio.
+Пользователь также может задать высоту XBlock в пикселях в Studio.
 
-## Pre/Post Processors
-There are various pre and post processors that are applied to notebook when converting it to the final HTML.
+## Пре/Пост-обработчики
+Существует несколько пре- и пост-обработчиков, которые применяются к ноутбуку при его преобразовании в финальный HTML.
 
-### Pre-Processors
-These operate on each cell of the notebook, typically making some kind of change to either the overall notebook structure or a single cell.
+### Пре-обработчики
+Они работают с каждой ячейкой ноутбука, обычно внося изменения либо в общую структуру ноутбука, либо в отдельную ячейку.
 
-The cells of the notebook are iterated over and each cell is passed to each processor in the sequence the processors are added. 
+Ячейки ноутбука перебираются поочередно, и каждая ячейка передается каждому обработчику в порядке, в котором они добавлены.
 
-After all cells have completed, the `finish` function is called for each processor to do any final cleanup.
+После завершения обработки всех ячеек вызывается функция `finish` для каждого обработчика для выполнения любых заключительных операций.
 
-New pre-processors can be added by subclassing `preprocessors.Processor` and appending an instance of it to the `transforms` list.
+Новые пре-обработчики можно добавить, создавая подклассы от `preprocessors.Processor` и добавляя экземпляр в список `transforms`.
 
-### Post-Processors
-These operate on the final, raw HTML output string, making modifications as necessary. 
+### Пост-обработчики
+Они работают с финальной, необработанной строкой HTML, внося необходимые изменения.
 
-New post processors can be added in the `postprocess` function
+Новые пост-обработчики можно добавить в функцию `postprocess`.
 
-## Usage notes
+## Примечания по использованию
 
-### Watch the demo!
+### Посмотрите демо!
 
-[![demo](https://github.com/ibleducation/jupyter-viewer-xblock/blob/master/demo-thumbnail.png)](http://www.youtube.com/watch?v=K8jhWgQnxvI)
+[![демо](https://github.com/ibleducation/jupyter-viewer-xblock/blob/master/demo-thumbnail.png)](http://www.youtube.com/watch?v=K8jhWgQnxvI)
 
-### Functionality
+### Функциональность
 
-The Jupyter Viewer XBlock allows a course author to add content to an online course on the Open edX platform, from a publicly available Jupyter notebook (e.g., on GitHub).
-If you only provide one parameter, the notebook's public URL, the XBlock will display the entire notebook in an iframe.
-But it's often the case that instructors write Jupyter notebooks with a full lesson, over several pages if printed.
-Showing the whole notebook in one frame withing the online course may yield a clunky user experience.
-In our experience, your online course will look beter if you display a whole lesson over several units in an Open edX learning sequence.
-You can achieve this effect by choosing _start_ and _end_ tags: strings in the source notebook that mark the first and (exclusive) last cells to display.
-After choosing these tags, you may want to adjust the iframe height to fit the content length.
-If you have images embedded in markdown cells, you are likely to have a relative path that works in your local notebook.
-In the XBlock, you can provide the absolute path to the images in your notebook repo to ensure that they are properly shown.
+Jupyter Viewer XBlock позволяет автору курса добавить контент в онлайн-курс на платформе Open edX, используя общедоступный Jupyter Notebook (например, на GitHub).
+Если вы предоставите только один параметр — публичный URL ноутбука, XBlock отобразит весь ноутбук в iframe.
+Но часто преподаватели создают Jupyter Notebook с полным уроком, который может занимать несколько страниц при печати.
+Отображение всего ноутбука в одном фрейме внутри онлайн-курса может ухудшить пользовательский опыт.
+Наш опыт показывает, что ваш онлайн-курс будет выглядеть лучше, если вы разбьете урок на несколько единиц в последовательности обучения на Open edX.
+Вы можете достичь этого, выбрав теги _start_ и _end_ — строки в исходном ноутбуке, которые отмечают первую и (исключительно) последнюю ячейки для отображения.
+После выбора этих тегов вы можете настроить высоту iframe, чтобы она соответствовала длине контента.
+Если у вас есть изображения, встроенные в ячейки с Markdown, скорее всего, у вас есть относительный путь, который работает в вашем локальном ноутбуке.
+В XBlock вы можете указать абсолютный путь к изображениям в репозитории ноутбука, чтобы они корректно отображались.
 
-## Copyright and License
-
-(c) 2017 IBL Studios and Lorena A. Barba, [code is under BSD-3 clause](https://github.com/engineersCode/EngComp/blob/master/LICENSE). 
-
-[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
